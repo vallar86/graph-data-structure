@@ -27,7 +27,7 @@ class CycleError extends Error
     }
 }
 
-interface IGraph<NodeId>
+export interface IGraph<NodeId>
 {
     addNode(node: NodeId): IGraph<NodeId>,
     removeNode(node: NodeId): IGraph<NodeId>,
@@ -54,7 +54,7 @@ interface IGraph<NodeId>
 }
 
 // A graph data structure with depth-first search and topological sort.
-function Graph<NodeId extends string | number | symbol>(serialized?: Serialized<NodeId>) 
+export function Graph<NodeId extends string | number | symbol>(serialized?: Serialized<NodeId>) 
 {
     // Returned graph instance
     const graph: IGraph<NodeId> = {
@@ -530,5 +530,3 @@ function Graph<NodeId extends string | number | symbol>(serialized?: Serialized<
     // The returned graph instance.
     return graph;
 }
-
-export = Graph;
