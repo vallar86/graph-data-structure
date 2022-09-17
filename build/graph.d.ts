@@ -9,7 +9,7 @@ interface Serialized<NodeId> {
         weight: EdgeWeight;
     }[];
 }
-interface IGraph<NodeId> {
+export interface IGraph<NodeId> {
     addNode(node: NodeId): IGraph<NodeId>;
     removeNode(node: NodeId): IGraph<NodeId>;
     nodes(): NodeId[];
@@ -31,5 +31,5 @@ interface IGraph<NodeId> {
     serialize(): Serialized<NodeId>;
     deserialize(serialized: Serialized<NodeId>): IGraph<NodeId>;
 }
-declare function Graph<NodeId extends string | number | symbol>(serialized?: Serialized<NodeId>): IGraph<NodeId>;
-export = Graph;
+export declare function Graph<NodeId extends string | number | symbol>(serialized?: Serialized<NodeId>): IGraph<NodeId>;
+export {};

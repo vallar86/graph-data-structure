@@ -13,8 +13,9 @@
         "strictNullChecks": true,
         "downlevelIteration": true,
         "isolatedModules": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "outDir": "build"
     },
-    "file": ["index.ts"],
-    "exclude": ["node_modules", "*.d.ts"]
+    "include": ["src"],
+    "exclude": ["node_modules", "tests", "build", "*.d.ts"]
 }

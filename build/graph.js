@@ -7,6 +7,8 @@
 4) Добавить лукап
 
 */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Graph = void 0;
 class CycleError extends Error {
     constructor(message) {
         super(message);
@@ -374,5 +376,5 @@ function Graph(serialized) {
     // The returned graph instance.
     return graph;
 }
-module.exports = Graph;
-//# sourceMappingURL=index.js.map
+exports.Graph = Graph;
+//# sourceMappingURL=graph.js.map
