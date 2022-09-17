@@ -1,4 +1,12 @@
 "use strict";
+/*
+
+1) Прописать типы и интерфейс возврата
+2) Сделать тип узла дженериком
+3) Сделать тип узла дженериком?
+4) Добавить лукап
+
+*/
 class CycleError extends Error {
     constructor(message) {
         super(message);
@@ -31,7 +39,7 @@ function Graph(serialized) {
     // The adjacency list of the graph.
     // Keys are node ids.
     // Values are adjacent node id arrays.
-    const edges = {};
+    const edges = new Map();
     // The weights of edges.
     // Keys are string encodings of edges.
     // Values are weights (numbers).
@@ -44,55 +52,58 @@ function Graph(serialized) {
     // If node was already added, this function does nothing.
     // If node was not already added, this function sets up an empty adjacency list.
     function addNode(node) {
-        edges[node] = adjacent(node);
+        edges.set(node, adjacentAsSet(node));
         return graph;
     }
     // Removes a node from the graph.
     // Also removes incoming and outgoing edges.
     function removeNode(node) {
         // Remove incoming edges.
-        Object.keys(edges).forEach(function (u) {
-            edges[u].forEach(function (v) {
+        edges.forEach(function (set, u) {
+            set.forEach(function (x, v) {
                 if (v === node) {
                     removeEdge(u, v);
                 }
             });
         });
         // Remove outgoing edges (and signal that the node no longer exists).
-        delete edges[node];
+        edges.delete(node);
         return graph;
     }
     // Gets the list of nodes that have been added to the graph.
     function nodes() {
         // TODO: Better implementation with set data structure
-        const nodeSet = {};
-        Object.keys(edges).forEach(function (u) {
-            nodeSet[u] = true;
-            edges[u].forEach(function (v) {
-                nodeSet[v] = true;
-            });
-        });
-        return Object.keys(nodeSet);
+        // const nodeSet: Record<NodeId, boolean> = {};
+        // Object.keys(edges).forEach(function (u)
+        // {
+        //     nodeSet[u] = true;
+        //     edges[u].forEach(function (v)
+        //     {
+        //         nodeSet[v] = true;
+        //     });
+        // });
+        // return Object.keys(nodeSet);
+        return Array.from(edges.keys());
     }
     // Gets the adjacent node list for the given node.
     // Returns an empty array for unknown nodes.
     function adjacent(node) {
-        return edges[node] || [];
+        return Array.from(adjacentAsSet(node));
     }
-    // Computes a string encoding of an edge,
-    // for use as a key in an object.
-    function encodeEdge(u, v) {
-        return u + "|" + v;
+    // Gets the adjacent node list for the given node.
+    // Returns an empty array for unknown nodes.
+    function adjacentAsSet(node) {
+        return edges.get(node) || new Set();
     }
     // Sets the weight of the given edge.
     function setEdgeWeight(u, v, weight) {
-        edgeWeights[encodeEdge(u, v)] = weight;
+        edgeWeights[`${u.toString()}|${v.toString()}`] = weight;
         return graph;
     }
     // Gets the weight of the given edge.
     // Returns 1 if no weight was previously set.
     function getEdgeWeight(u, v) {
-        const weight = edgeWeights[encodeEdge(u, v)];
+        const weight = edgeWeights[`${u.toString()}|${v.toString()}`];
         return weight === undefined ? 1 : weight;
     }
     // Adds an edge from node u to node v.
@@ -100,7 +111,7 @@ function Graph(serialized) {
     function addEdge(u, v, weight) {
         addNode(u);
         addNode(v);
-        adjacent(u).push(v);
+        edges.get(u).add(v);
         if (weight !== undefined) {
             setEdgeWeight(u, v, weight);
         }
@@ -110,34 +121,30 @@ function Graph(serialized) {
     // Does not remove the nodes.
     // Does nothing if the edge does not exist.
     function removeEdge(u, v) {
-        if (edges[u]) {
-            edges[u] = adjacent(u).filter(function (_v) {
-                return _v !== v;
-            });
+        var _a, _b;
+        if (edges.has(u) && ((_a = edges.get(u)) === null || _a === void 0 ? void 0 : _a.has(v))) {
+            (_b = edges.get(u)) === null || _b === void 0 ? void 0 : _b.delete(v);
         }
         return graph;
     }
     // Returns true if there is an edge from node u to node v.
     function hasEdge(u, v) {
-        return adjacent(u).includes(v);
+        var _a;
+        return edges.has(u) && ((_a = edges.get(u)) === null || _a === void 0 ? void 0 : _a.has(v));
     }
     // Computes the indegree for the given node.
     // Not very efficient, costs O(E) where E = number of edges.
     function indegree(node) {
         let degree = 0;
-        function check(v) {
-            if (v === node) {
+        edges.forEach(function (set, u) {
+            if (set.has(node))
                 degree++;
-            }
-        }
-        Object.keys(edges).forEach(function (u) {
-            edges[u].forEach(check);
         });
         return degree;
     }
     // Computes the outdegree for the given node.
     function outdegree(node) {
-        return node in edges ? edges[node].length : 0;
+        return edges.has(node) ? edges.get(node).size : 0;
     }
     // Depth First Search algorithm, inspired by
     // Cormen et al. "Introduction to Algorithms" 3rd Ed. p. 604
@@ -152,18 +159,18 @@ function Graph(serialized) {
         if (typeof includeSourceNodes !== "boolean") {
             includeSourceNodes = true;
         }
-        const visited = {};
-        const visiting = {};
+        const visited = new Set();
+        const visiting = new Set();
         const nodeList = [];
         function DFSVisit(node) {
-            if (visiting[node] && errorOnCycle) {
+            if (visiting.has(node) && errorOnCycle) {
                 throw new CycleError("Cycle found");
             }
-            if (!visited[node]) {
-                visited[node] = true;
-                visiting[node] = true; // temporary flag while visiting
-                adjacent(node).forEach(DFSVisit);
-                visiting[node] = false;
+            if (!visited.has(node)) {
+                visited.add(node);
+                visiting.add(node); // temporary flag while visiting
+                adjacentAsSet(node).forEach(DFSVisit);
+                visiting.delete(node);
                 nodeList.push(node);
             }
         }
@@ -172,10 +179,10 @@ function Graph(serialized) {
         }
         else {
             sourceNodes.forEach(function (node) {
-                visited[node] = true;
+                visited.add(node);
             });
             sourceNodes.forEach(function (node) {
-                adjacent(node).forEach(DFSVisit);
+                adjacentAsSet(node).forEach(DFSVisit);
             });
         }
         return nodeList;
@@ -203,37 +210,35 @@ function Graph(serialized) {
         const node1Ancestors = [];
         const lcas = [];
         function CA1Visit(visited, node) {
-            if (!visited[node]) {
-                visited[node] = true;
+            if (!visited.has(node)) {
+                visited.add(node);
                 node1Ancestors.push(node);
                 if (node == node2) {
                     lcas.push(node);
                     return false; // found - shortcut
                 }
-                return adjacent(node).every(node => {
-                    return CA1Visit(visited, node);
-                });
+                return Array.from(adjacentAsSet(node).values()).every(node => CA1Visit(visited, node));
             }
             else {
                 return true;
             }
         }
         function CA2Visit(visited, node) {
-            if (!visited[node]) {
-                visited[node] = true;
+            if (!visited.has(node)) {
+                visited.add(node);
                 if (node1Ancestors.indexOf(node) >= 0) {
                     lcas.push(node);
                 }
                 else if (lcas.length == 0) {
-                    adjacent(node).forEach(node => {
+                    adjacentAsSet(node).forEach(node => {
                         CA2Visit(visited, node);
                     });
                 }
             }
         }
-        if (CA1Visit({}, node1)) {
+        if (CA1Visit(new Set(), node1)) {
             // No shortcut worked
-            CA2Visit({}, node2);
+            CA2Visit(new Set(), node2);
         }
         return lcas;
     }
@@ -280,6 +285,7 @@ function Graph(serialized) {
         function extractMin() {
             let min = Infinity;
             let minNode;
+            let xxx = Object.keys(q);
             Object.keys(q).forEach(function (node) {
                 if (d[node] < min) {
                     min = d[node];
@@ -308,7 +314,7 @@ function Graph(serialized) {
                 const u = extractMin();
                 if (u === null)
                     return;
-                adjacent(u).forEach(function (v) {
+                adjacentAsSet(u).forEach(function (v) {
                     relax(u, v);
                 });
             }
@@ -345,7 +351,7 @@ function Graph(serialized) {
         };
         serialized.nodes.forEach(function (node) {
             const source = node.id;
-            adjacent(source).forEach(function (target) {
+            adjacentAsSet(source).forEach(function (target) {
                 serialized.links.push({
                     source: source,
                     target: target,
@@ -369,3 +375,4 @@ function Graph(serialized) {
     return graph;
 }
 module.exports = Graph;
+//# sourceMappingURL=index.js.map

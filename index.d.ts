@@ -1,6 +1,5 @@
-declare type NodeId = string;
 declare type EdgeWeight = number;
-interface Serialized {
+interface Serialized<NodeId> {
     nodes: {
         id: NodeId;
     }[];
@@ -10,26 +9,27 @@ interface Serialized {
         weight: EdgeWeight;
     }[];
 }
-declare function Graph(serialized?: Serialized): {
-    addNode: (node: NodeId) => any;
-    removeNode: (node: NodeId) => any;
-    nodes: () => NodeId[];
-    adjacent: (node: NodeId) => NodeId[];
-    addEdge: (u: NodeId, v: NodeId, weight?: number | undefined) => any;
-    removeEdge: (u: NodeId, v: NodeId) => any;
-    hasEdge: (u: NodeId, v: NodeId) => boolean;
-    setEdgeWeight: (u: NodeId, v: NodeId, weight: EdgeWeight) => any;
-    getEdgeWeight: (u: NodeId, v: NodeId) => EdgeWeight;
-    indegree: (node: NodeId) => number;
-    outdegree: (node: NodeId) => number;
-    depthFirstSearch: (sourceNodes?: string[] | undefined, includeSourceNodes?: boolean, errorOnCycle?: boolean) => string[];
-    hasCycle: () => boolean;
-    lowestCommonAncestors: (node1: NodeId, node2: NodeId) => string[];
-    topologicalSort: (sourceNodes?: string[] | undefined, includeSourceNodes?: boolean) => string[];
-    shortestPath: (source: NodeId, destination: NodeId) => string[] & {
-        weight?: number | undefined;
+interface IGraph<NodeId> {
+    addNode(node: NodeId): IGraph<NodeId>;
+    removeNode(node: NodeId): IGraph<NodeId>;
+    nodes(): NodeId[];
+    adjacent(node: NodeId): NodeId[];
+    addEdge(u: NodeId, v: NodeId, weight?: EdgeWeight): IGraph<NodeId>;
+    removeEdge(u: NodeId, v: NodeId): IGraph<NodeId>;
+    hasEdge(u: NodeId, v: NodeId): boolean;
+    setEdgeWeight(u: NodeId, v: NodeId, weight: EdgeWeight): IGraph<NodeId>;
+    getEdgeWeight(u: NodeId, v: NodeId): EdgeWeight;
+    indegree(node: NodeId): number;
+    outdegree(node: NodeId): number;
+    depthFirstSearch(sourceNodes: NodeId[], includeSourceNodes: boolean, errorOnCycle: boolean): NodeId[];
+    hasCycle(): boolean;
+    lowestCommonAncestors(node1: NodeId, node2: NodeId): NodeId[];
+    topologicalSort(sourceNodes: NodeId[], includeSourceNodes: boolean): NodeId[];
+    shortestPath(source: NodeId, destination: NodeId): NodeId[] & {
+        weight?: EdgeWeight;
     };
-    serialize: () => Serialized;
-    deserialize: (serialized: Serialized) => any;
-};
+    serialize(): Serialized<NodeId>;
+    deserialize(serialized: Serialized<NodeId>): IGraph<NodeId>;
+}
+declare function Graph<NodeId extends string | number | symbol>(serialized?: Serialized<NodeId>): IGraph<NodeId>;
 export = Graph;

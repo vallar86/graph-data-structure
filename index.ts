@@ -1,23 +1,63 @@
-type NodeId = string;
+/*
+
+1) Прописать типы и интерфейс возврата
+2) Сделать тип узла дженериком
+3) Сделать тип узла дженериком?
+4) Добавить лукап
+
+*/
+
 type EdgeWeight = number;
 type EncodedEdge = string;
 
-interface Serialized {
+// type NodeId = string;
+
+interface Serialized<NodeId>
+{
     nodes: { id: NodeId }[];
     links: { source: NodeId; target: NodeId; weight: EdgeWeight }[];
 }
 
-class CycleError extends Error {
-    constructor(message: string) {
+class CycleError extends Error
+{
+    constructor(message: string)
+    {
         super(message);
         Object.setPrototypeOf(this, CycleError.prototype);
     }
 }
 
+interface IGraph<NodeId>
+{
+    addNode(node: NodeId): IGraph<NodeId>,
+    removeNode(node: NodeId): IGraph<NodeId>,
+    nodes(): NodeId[],
+    adjacent(node: NodeId): NodeId[],
+    addEdge(u: NodeId, v: NodeId, weight?: EdgeWeight): IGraph<NodeId>,
+    removeEdge(u: NodeId, v: NodeId): IGraph<NodeId>,
+    hasEdge(u: NodeId, v: NodeId): boolean,
+    setEdgeWeight(u: NodeId, v: NodeId, weight: EdgeWeight): IGraph<NodeId>,
+    getEdgeWeight(u: NodeId, v: NodeId): EdgeWeight,
+    indegree(node: NodeId): number,
+    outdegree(node: NodeId): number,
+    depthFirstSearch(
+        sourceNodes: NodeId[],
+        includeSourceNodes: boolean,
+        errorOnCycle: boolean,
+    ): NodeId[],
+    hasCycle(): boolean,
+    lowestCommonAncestors(node1: NodeId, node2: NodeId): NodeId[],
+    topologicalSort(sourceNodes: NodeId[], includeSourceNodes: boolean): NodeId[],
+    shortestPath(source: NodeId, destination: NodeId): NodeId[] & { weight?: EdgeWeight },
+    serialize(): Serialized<NodeId>,
+    deserialize(serialized: Serialized<NodeId>): IGraph<NodeId>
+}
+
 // A graph data structure with depth-first search and topological sort.
-function Graph(serialized?: Serialized) {
+function Graph<NodeId extends string | number | symbol>(serialized?: Serialized<NodeId>) 
+{
     // Returned graph instance
-    const graph = {
+    const graph: IGraph<NodeId> = {
         addNode,
         removeNode,
         nodes,
@@ -41,7 +81,7 @@ function Graph(serialized?: Serialized) {
     // The adjacency list of the graph.
     // Keys are node ids.
     // Values are adjacent node id arrays.
-    const edges: Record<NodeId, NodeId[]> = {};
+    const edges: Map<NodeId, Set<NodeId>> = new Map<NodeId, Set<NodeId>>();
 
     // The weights of edges.
     // Keys are string encodings of edges.
@@ -49,83 +89,101 @@ function Graph(serialized?: Serialized) {
     const edgeWeights: Record<EncodedEdge, EdgeWeight> = {};
 
     // If a serialized graph was passed into the constructor, deserialize it.
-    if (serialized) {
+    if (serialized)
+    {
         deserialize(serialized);
     }
 
     // Adds a node to the graph.
     // If node was already added, this function does nothing.
     // If node was not already added, this function sets up an empty adjacency list.
-    function addNode(node: NodeId) {
-        edges[node] = adjacent(node);
+    function addNode(node: NodeId): IGraph<NodeId>
+    {
+        edges.set(node, adjacentAsSet(node));
         return graph;
     }
 
     // Removes a node from the graph.
     // Also removes incoming and outgoing edges.
-    function removeNode(node: NodeId) {
+    function removeNode(node: NodeId): IGraph<NodeId>
+    {
         // Remove incoming edges.
-        Object.keys(edges).forEach(function(u) {
-            edges[u].forEach(function(v) {
-                if (v === node) {
+        edges.forEach(function (set, u)
+        {
+            set.forEach(function (x, v)
+            {
+                if (v === node)
+                {
                     removeEdge(u, v);
                 }
             });
         });
 
         // Remove outgoing edges (and signal that the node no longer exists).
-        delete edges[node];
+        edges.delete(node);
 
         return graph;
     }
 
     // Gets the list of nodes that have been added to the graph.
-    function nodes(): NodeId[] {
+    function nodes(): NodeId[]
+    {
         // TODO: Better implementation with set data structure
-        const nodeSet: Record<NodeId, boolean> = {};
+        // const nodeSet: Record<NodeId, boolean> = {};
 
-        Object.keys(edges).forEach(function(u) {
-            nodeSet[u] = true;
-            edges[u].forEach(function(v) {
-                nodeSet[v] = true;
-            });
-        });
-        return Object.keys(nodeSet);
+        // Object.keys(edges).forEach(function (u)
+        // {
+        //     nodeSet[u] = true;
+        //     edges[u].forEach(function (v)
+        //     {
+        //         nodeSet[v] = true;
+        //     });
+        // });
+        // return Object.keys(nodeSet);
+
+        return Array.from(edges.keys());
     }
 
     // Gets the adjacent node list for the given node.
     // Returns an empty array for unknown nodes.
-    function adjacent(node: NodeId): NodeId[] {
-        return edges[node] || [];
+    function adjacent(node: NodeId): NodeId[]
+    {
+        return Array.from(adjacentAsSet(node));
     }
 
-    // Computes a string encoding of an edge,
-    // for use as a key in an object.
-    function encodeEdge(u: NodeId, v: NodeId): EncodedEdge {
-        return u + "|" + v;
+    // Gets the adjacent node list for the given node.
+    // Returns an empty array for unknown nodes.
+    function adjacentAsSet(node: NodeId): Set<NodeId>
+    {
+        return edges.get(node) || new Set<NodeId>();
     }
 
     // Sets the weight of the given edge.
-    function setEdgeWeight(u: NodeId, v: NodeId, weight: EdgeWeight) {
-        edgeWeights[encodeEdge(u, v)] = weight;
+    function setEdgeWeight(u: NodeId, v: NodeId, weight: EdgeWeight): IGraph<NodeId>
+    {
+        edgeWeights[`${u.toString()}|${v.toString()}`] = weight;
         return graph;
     }
 
     // Gets the weight of the given edge.
     // Returns 1 if no weight was previously set.
-    function getEdgeWeight(u: NodeId, v: NodeId): EdgeWeight {
-        const weight = edgeWeights[encodeEdge(u, v)];
+    function getEdgeWeight(u: NodeId, v: NodeId): EdgeWeight
+    {
+        const weight = edgeWeights[`${u.toString()}|${v.toString()}`];
         return weight === undefined ? 1 : weight;
     }
 
     // Adds an edge from node u to node v.
     // Implicitly adds the nodes if they were not already added.
-    function addEdge(u: NodeId, v: NodeId, weight?: EdgeWeight) {
+    function addEdge(u: NodeId, v: NodeId, weight?: EdgeWeight): IGraph<NodeId>
+    {
         addNode(u);
         addNode(v);
-        adjacent(u).push(v);
+        
+        (edges.get(u) as Set<NodeId>).add(v);
 
-        if (weight !== undefined) {
+        if (weight !== undefined)
+        {
             setEdgeWeight(u, v, weight);
         }
 
@@ -135,38 +193,39 @@ function Graph(serialized?: Serialized) {
     // Removes the edge from node u to node v.
     // Does not remove the nodes.
     // Does nothing if the edge does not exist.
-    function removeEdge(u: NodeId, v: NodeId) {
-        if (edges[u]) {
-            edges[u] = adjacent(u).filter(function(_v) {
-                return _v !== v;
-            });
+    function removeEdge(u: NodeId, v: NodeId): IGraph<NodeId>
+    {
+        if (edges.has(u) && edges.get(u)?.has(v))
+        {
+            edges.get(u)?.delete(v);
         }
         return graph;
     }
 
     // Returns true if there is an edge from node u to node v.
-    function hasEdge(u: NodeId, v: NodeId) {
-        return adjacent(u).includes(v);
+    function hasEdge(u: NodeId, v: NodeId): boolean
+    {
+        return edges.has(u) && (edges.get(u) as Set<NodeId>)?.has(v);
     }
 
     // Computes the indegree for the given node.
     // Not very efficient, costs O(E) where E = number of edges.
-    function indegree(node: NodeId) {
+    function indegree(node: NodeId): number
+    {
         let degree = 0;
-        function check(v: NodeId) {
-            if (v === node) {
+
+        edges.forEach(function (set, u)
+        {
+            if (set.has(node))
                 degree++;
-            }
-        }
-        Object.keys(edges).forEach(function(u) {
-            edges[u].forEach(check);
         });
         return degree;
     }
 
     // Computes the outdegree for the given node.
-    function outdegree(node: NodeId) {
-        return node in edges ? edges[node].length : 0;
+    function outdegree(node: NodeId): number 
+    {
+        return edges.has(node) ? (edges.get(node) as Set<NodeId>).size : 0;
     }
 
     // Depth First Search algorithm, inspired by
@@ -179,40 +238,50 @@ function Graph(serialized?: Serialized) {
         sourceNodes?: NodeId[],
         includeSourceNodes: boolean = true,
         errorOnCycle: boolean = false,
-    ) {
-        if (!sourceNodes) {
+    ): NodeId[]
+    {
+        if (!sourceNodes)
+        {
             sourceNodes = nodes();
         }
 
-        if (typeof includeSourceNodes !== "boolean") {
+        if (typeof includeSourceNodes !== "boolean")
+        {
             includeSourceNodes = true;
         }
 
-        const visited: Record<NodeId, boolean> = {};
-        const visiting: Record<NodeId, boolean> = {};
+        const visited: Set<NodeId> = new Set<NodeId>();
+        const visiting: Set<NodeId> = new Set<NodeId>();
         const nodeList: NodeId[] = [];
 
-        function DFSVisit(node: NodeId) {
-            if (visiting[node] && errorOnCycle) {
+        function DFSVisit(node: NodeId): void
+        {
+            if (visiting.has(node) && errorOnCycle)
+            {
                 throw new CycleError("Cycle found");
             }
-            if (!visited[node]) {
-                visited[node] = true;
-                visiting[node] = true;  // temporary flag while visiting
-                adjacent(node).forEach(DFSVisit);
-                visiting[node] = false;
+            if (!visited.has(node))
+            {
+                visited.add(node);
+                visiting.add(node);  // temporary flag while visiting
+                adjacentAsSet(node).forEach(DFSVisit);
+                visiting.delete(node);
                 nodeList.push(node);
             }
         }
 
-        if (includeSourceNodes) {
+        if (includeSourceNodes)
+        {
             sourceNodes.forEach(DFSVisit);
-        } else {
-            sourceNodes.forEach(function(node) {
-                visited[node] = true;
+        } else
+        {
+            sourceNodes.forEach(function (node)
+            {
+                visited.add(node);
             });
-            sourceNodes.forEach(function(node) {
-                adjacent(node).forEach(DFSVisit);
+            sourceNodes.forEach(function (node)
+            {
+                adjacentAsSet(node).forEach(DFSVisit);
             });
         }
 
@@ -220,17 +289,22 @@ function Graph(serialized?: Serialized) {
     }
 
     // Returns true if the graph has one or more cycles and false otherwise
-    function hasCycle(): boolean {
-        try {
+    function hasCycle(): boolean
+    {
+        try
+        {
             depthFirstSearch(undefined, true, true);
             // No error thrown -> no cycles
             return false;
         }
-        catch (error) {
-            if (error instanceof CycleError) {
+        catch (error)
+        {
+            if (error instanceof CycleError)
+            {
                 return true;
             }
-            else {
+            else
+            {
                 throw error;
             }
         }
@@ -239,45 +313,56 @@ function Graph(serialized?: Serialized) {
     // Least Common Ancestors
     // Inspired by https://github.com/relaxedws/lca/blob/master/src/LowestCommonAncestor.php code
     // but uses depth search instead of breadth. Also uses some optimizations
-    function lowestCommonAncestors(node1: NodeId, node2: NodeId) {
+    function lowestCommonAncestors(node1: NodeId, node2: NodeId): NodeId[]
+    {
         const node1Ancestors: NodeId[] = [];
         const lcas: NodeId[] = [];
 
         function CA1Visit(
-            visited: Record<NodeId, boolean>,
+            visited: Set<NodeId>,
             node: NodeId
-        ): boolean {
-            if (!visited[node]) {
-                visited[node] = true;
+        ): boolean
+        {
+            if (!visited.has(node))
+            {
+                visited.add(node);
                 node1Ancestors.push(node);
-                if (node == node2) {
+                if (node == node2)
+                {
                     lcas.push(node);
                     return false; // found - shortcut
                 }
-                return adjacent(node).every(node => {
-                    return CA1Visit(visited, node);
-                });
-            } else {
+
+                return Array.from(adjacentAsSet(node).values()).every(node => CA1Visit(visited, node));
+
+            } else
+            {
                 return true;
             }
         }
 
-        function CA2Visit(visited: Record<NodeId, boolean>, node: NodeId) {
-            if (!visited[node]) {
-                visited[node] = true;
-                if (node1Ancestors.indexOf(node) >= 0) {
+        function CA2Visit(visited: Set<NodeId>, node: NodeId)
+        {
+            if (!visited.has(node))
+            {
+                visited.add(node);
+                if (node1Ancestors.indexOf(node) >= 0)
+                {
                     lcas.push(node);
-                } else if (lcas.length == 0) {
-                    adjacent(node).forEach(node => {
+                } else if (lcas.length == 0)
+                {
+                    adjacentAsSet(node).forEach(node =>
+                    {
                         CA2Visit(visited, node);
                     });
                 }
             }
         }
 
-        if (CA1Visit({}, node1)) {
+        if (CA1Visit(new Set<NodeId>(), node1))
+        {
             // No shortcut worked
-            CA2Visit({}, node2);
+            CA2Visit(new Set<NodeId>(), node2);
         }
 
         return lcas;
@@ -290,7 +375,8 @@ function Graph(serialized?: Serialized) {
     function topologicalSort(
         sourceNodes?: NodeId[],
         includeSourceNodes: boolean = true
-    ) {
+    ): NodeId[]
+    {
         return depthFirstSearch(sourceNodes, includeSourceNodes, true).reverse();
     }
 
@@ -299,13 +385,13 @@ function Graph(serialized?: Serialized) {
     // Variable and function names correspond to names in the book.
     function shortestPath(source: NodeId, destination: NodeId) {
         // Upper bounds for shortest path weights from source.
-        const d: Record<NodeId, EdgeWeight> = {};
+        const d: Record<NodeId, EdgeWeight> = {} as Record<NodeId, EdgeWeight>;
 
         // Predecessors.
-        const p: Record<NodeId, NodeId> = {};
+        const p: Record<NodeId, NodeId> = {} as Record<NodeId, NodeId>;
 
         // Poor man's priority queue, keyed on d.
-        let q: Record<NodeId, boolean> = {};
+        let q: Record<NodeId, boolean> = {} as Record<NodeId, boolean>;
 
         function initializeSingleSource() {
             nodes().forEach(function(node) {
@@ -336,15 +422,19 @@ function Graph(serialized?: Serialized) {
         function extractMin(): NodeId | null {
             let min = Infinity;
             let minNode;
+
+            let xxx = Object.keys(q);
+
+
             Object.keys(q).forEach(function(node) {
-                if (d[node] < min) {
-                    min = d[node];
+                if (d[node as NodeId] < min) {
+                    min = d[node as NodeId];
                     minNode = node;
                 }
             });
             if (minNode === undefined) {
                 // If we reach here, there's a disconnected subgraph, and we're done.
-                q = {};
+                q = {} as Record<NodeId, boolean>;
                 return null;
             }
             delete q[minNode];
@@ -365,8 +455,8 @@ function Graph(serialized?: Serialized) {
             while (!priorityQueueEmpty()) {
                 const u = extractMin();
                 if (u === null) return;
-                adjacent(u).forEach(function(v) {
-                    relax(u as string, v);
+                adjacentAsSet(u).forEach(function(v) {
+                    relax(u, v);
                 });
             }
         }
@@ -397,17 +487,21 @@ function Graph(serialized?: Serialized) {
     }
 
     // Serializes the graph.
-    function serialize() {
-        const serialized: Serialized = {
-            nodes: nodes().map(function(id) {
+    function serialize(): Serialized<NodeId>
+    {
+        const serialized: Serialized<NodeId> = {
+            nodes: nodes().map(function (id)
+            {
                 return { id: id };
             }),
             links: []
         };
 
-        serialized.nodes.forEach(function(node) {
+        serialized.nodes.forEach(function (node)
+        {
             const source = node.id;
-            adjacent(source).forEach(function(target) {
+            adjacentAsSet(source).forEach(function (target)
+            {
                 serialized.links.push({
                     source: source,
                     target: target,
@@ -420,11 +514,14 @@ function Graph(serialized?: Serialized) {
     }
 
     // Deserializes the given serialized graph.
-    function deserialize(serialized: Serialized) {
-        serialized.nodes.forEach(function(node) {
+    function deserialize(serialized: Serialized<NodeId>): IGraph<NodeId>
+    {
+        serialized.nodes.forEach(function (node)
+        {
             addNode(node.id);
         });
-        serialized.links.forEach(function(link) {
+        serialized.links.forEach(function (link)
+        {
             addEdge(link.source, link.target, link.weight);
         });
         return graph;
@@ -433,4 +530,5 @@ function Graph(serialized?: Serialized) {
     // The returned graph instance.
     return graph;
 }
+
 export = Graph;
