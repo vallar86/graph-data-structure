@@ -20,7 +20,7 @@ graph.addEdge("c", "b", 0.5);
 graph.addEdge("c", "d", 1);
 graph.addEdge("d", "c", 0.5);
 const lookup = lookup_1.Lookup(graph, 3);
-lookup.Loops(3, ["b"]);
+lookup.Loops(3, ["b", "d"]);
 __exportStar(require("./graph"), exports);
 __exportStar(require("./lookup"), exports);
 //# sourceMappingURL=index.js.map

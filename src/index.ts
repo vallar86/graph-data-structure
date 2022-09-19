@@ -10,7 +10,7 @@ graph.addEdge("c", "d", 1); graph.addEdge("d", "c", 0.5);
 
 const lookup = Lookup(graph, 3);
 
-lookup.Loops(3, ["b"]);
+lookup.Loops(3, ["b", "d"]);
 
 export * from './graph'
 export * from './lookup'
