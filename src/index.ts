@@ -3,28 +3,34 @@ export * from './graph'
 import ccxt from 'ccxt.pro'
 import { Graph } from './graph';
 
-const exchange = new ccxt.binance();
 
+async function main()
+{
 
-const graph = Graph();
+    const exchange = new ccxt.binance();
+    const graph = Graph();
 
-exchange.loadMarkets().then(markets => {
-
-    for(const market of Object.values(markets))
+    await exchange.loadMarkets().then(markets =>
     {
-        graph.addEdge(market.base, market.quote);
-        graph.addEdge(market.quote, market.base);
-    }
-
-    let count = 0;
-    const result = graph.depthFirstSearch(['USDT'], true, false, (list, level, path) => {
-        count++;
-        console.log(level, path);
-
+        for (const market of Object.values(markets))
+        {
+            graph.addEdge(market.base, market.quote);
+            graph.addEdge(market.quote, market.base);
+        }
     });
-    console.log(result, count);
 
-});
+    graph.lookup(['RUB'], 5, (path, level) => {
+        console.log(Array.from(path));
+        return level < 4;
+    })
+
+    console.log('done');
+}
+
+main();
+
+
+
 
 // graph.addEdge(1, 2)
 // graph.addEdge(1, 3)

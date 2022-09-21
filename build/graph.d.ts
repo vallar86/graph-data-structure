@@ -24,7 +24,7 @@ export interface IGraph<TNodeId, TNodeData> {
     getEdgeWeight(u: TNodeId, v: TNodeId): EdgeWeight;
     indegree(node: TNodeId): number;
     outdegree(node: TNodeId): number;
-    depthFirstSearch(sourceNodes: TNodeId[], includeSourceNodes: boolean, errorOnCycle: boolean, callback?: (nodes: TNodeId[], level: number, path: TNodeId[]) => void): TNodeId[];
+    depthFirstSearch(sourceNodes: TNodeId[], includeSourceNodes: boolean, errorOnCycle: boolean, maxLevel: number, callback?: (nodes: TNodeId[], level: number, path: TNodeId[]) => void): TNodeId[];
     hasCycle(): boolean;
     lowestCommonAncestors(node1: TNodeId, node2: TNodeId): TNodeId[];
     topologicalSort(sourceNodes: TNodeId[], includeSourceNodes: boolean): TNodeId[];
@@ -33,6 +33,7 @@ export interface IGraph<TNodeId, TNodeData> {
     };
     serialize(): Serialized<TNodeId, TNodeData>;
     deserialize(serialized: Serialized<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>;
+    lookup(sourceNodes: TNodeId[], maxLevel: number, callback: (path: Set<TNodeId>, level: number) => boolean): void;
 }
 export declare function Graph<TNodeId extends string | number | symbol, TNodeData extends any | undefined>(serialized?: Serialized<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>;
 export {};

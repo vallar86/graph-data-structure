@@ -42,6 +42,7 @@ export interface IGraph<TNodeId, TNodeData>
         sourceNodes: TNodeId[],
         includeSourceNodes: boolean,
         errorOnCycle: boolean,
+        maxLevel : number,
         callback? : (nodes: TNodeId[], level : number, path : TNodeId[]) => void
     ): TNodeId[],
     hasCycle(): boolean,
@@ -49,7 +50,8 @@ export interface IGraph<TNodeId, TNodeData>
     topologicalSort(sourceNodes: TNodeId[], includeSourceNodes: boolean): TNodeId[],
     shortestPath(source: TNodeId, destination: TNodeId): TNodeId[] & { weight?: EdgeWeight },
     serialize(): Serialized<TNodeId, TNodeData>,
-    deserialize(serialized: Serialized<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>
+    deserialize(serialized: Serialized<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>,
+    lookup(sourceNodes: TNodeId[], maxLevel : number, callback : (path : Set<TNodeId>, level : number) => boolean): void
 }
 
 // A graph data structure with depth-first search and topological sort.
@@ -70,6 +72,7 @@ export function Graph<TNodeId extends string | number | symbol, TNodeData extend
         indegree,
         outdegree,
         depthFirstSearch,
+        lookup,
         hasCycle,
         lowestCommonAncestors,
         topologicalSort,
@@ -281,6 +284,7 @@ export function Graph<TNodeId extends string | number | symbol, TNodeData extend
         sourceNodes?: TNodeId[],
         includeSourceNodes: boolean = true,
         errorOnCycle: boolean = false,
+        maxLevel: number = Number.MAX_SAFE_INTEGER,
         callback? : (nodes: TNodeId[], level : number, path : TNodeId[]) => void
     ): TNodeId[]
     {
@@ -297,7 +301,6 @@ export function Graph<TNodeId extends string | number | symbol, TNodeData extend
         const visited: Set<TNodeId> = new Set<TNodeId>();
         const visiting: Set<TNodeId> = new Set<TNodeId>();
         const nodeList: TNodeId[] = [];
-        const maxLevel: number = 5;
 
         function DFSVisit(node: TNodeId, level : number = 1, path : TNodeId[] = []): void
         {
@@ -579,6 +582,36 @@ export function Graph<TNodeId extends string | number | symbol, TNodeData extend
             addEdge(link.source, link.target, link.weight);
         });
         return graph;
+    }
+
+    function lookup(sourceNodes: TNodeId[], maxLevel : number, callback : (path : Set<TNodeId>, level : number) => boolean): void
+    {
+
+        const path = new Set<TNodeId>();
+
+        function process(node: TNodeId, level : number = 0)
+        {
+            if (!path.has(node))
+            {
+                path.add(node);
+
+                if (callback(path, level))
+                {
+
+                    for(const next of adjacent(node))
+                    {
+                        process(next, level + 1);
+                    }
+
+                }
+                path.delete(node);
+            }
+        }
+
+        for(const node of sourceNodes)
+        {
+            process(node);
+        }
     }
 
     // The returned graph instance.

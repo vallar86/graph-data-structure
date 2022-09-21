@@ -24,6 +24,7 @@ function Graph(serialized) {
         indegree,
         outdegree,
         depthFirstSearch,
+        lookup,
         hasCycle,
         lowestCommonAncestors,
         topologicalSort,
@@ -175,7 +176,7 @@ function Graph(serialized) {
     // include or exclude the source nodes from the result (true by default).
     // If `sourceNodes` is not specified, all nodes in the graph
     // are used as source nodes.
-    function depthFirstSearch(sourceNodes, includeSourceNodes = true, errorOnCycle = false, callback) {
+    function depthFirstSearch(sourceNodes, includeSourceNodes = true, errorOnCycle = false, maxLevel = Number.MAX_SAFE_INTEGER, callback) {
         if (!sourceNodes) {
             sourceNodes = nodes();
         }
@@ -185,7 +186,6 @@ function Graph(serialized) {
         const visited = new Set();
         const visiting = new Set();
         const nodeList = [];
-        const maxLevel = 5;
         function DFSVisit(node, level = 1, path = []) {
             if (visiting.has(node) && errorOnCycle) {
                 throw new CycleError("Cycle found");
@@ -398,6 +398,23 @@ function Graph(serialized) {
             addEdge(link.source, link.target, link.weight);
         });
         return graph;
+    }
+    function lookup(sourceNodes, maxLevel, callback) {
+        const path = new Set();
+        function process(node, level = 0) {
+            if (!path.has(node)) {
+                path.add(node);
+                if (callback(path, level)) {
+                    for (const next of adjacent(node)) {
+                        process(next, level + 1);
+                    }
+                }
+                path.delete(node);
+            }
+        }
+        for (const node of sourceNodes) {
+            process(node);
+        }
     }
     // The returned graph instance.
     return graph;
