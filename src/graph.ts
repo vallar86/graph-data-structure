@@ -51,7 +51,7 @@ export interface IGraph<TNodeId, TNodeData>
     shortestPath(source: TNodeId, destination: TNodeId): TNodeId[] & { weight?: EdgeWeight },
     serialize(): Serialized<TNodeId, TNodeData>,
     deserialize(serialized: Serialized<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>,
-    lookup(sourceNodes: TNodeId[], maxLevel : number, callback : (path : Set<TNodeId>, level : number) => boolean): void
+    lookup(sourceNodes: TNodeId[], callback : (path : Set<TNodeId>) => boolean): void
 }
 
 // A graph data structure with depth-first search and topological sort.
@@ -584,25 +584,23 @@ export function Graph<TNodeId extends string | number | symbol, TNodeData extend
         return graph;
     }
 
-    function lookup(sourceNodes: TNodeId[], maxLevel : number, callback : (path : Set<TNodeId>, level : number) => boolean): void
+    function lookup(sourceNodes: TNodeId[], callback : (path : Set<TNodeId>) => boolean): void
     {
 
         const path = new Set<TNodeId>();
 
-        function process(node: TNodeId, level : number = 0)
+        function process(node: TNodeId)
         {
             if (!path.has(node))
             {
                 path.add(node);
 
-                if (callback(path, level))
+                if (callback(path))
                 {
-
                     for(const next of adjacent(node))
                     {
-                        process(next, level + 1);
+                        process(next);
                     }
-
                 }
                 path.delete(node);
             }

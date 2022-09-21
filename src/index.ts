@@ -14,14 +14,22 @@ async function main()
     {
         for (const market of Object.values(markets))
         {
-            graph.addEdge(market.base, market.quote);
-            graph.addEdge(market.quote, market.base);
+            graph.addEdge(market.base, market.quote, 1.01);
+            graph.addEdge(market.quote, market.base, 0.99);
         }
     });
 
-    graph.lookup(['RUB'], 5, (path, level) => {
-        console.log(Array.from(path));
-        return level < 4;
+
+    graph.lookup(['RUB'], (path) => {
+        if (path.size < 4)
+        {
+            console.log(Array.from(path));
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     })
 
     console.log('done');
