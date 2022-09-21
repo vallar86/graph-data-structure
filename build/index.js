@@ -9,18 +9,31 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-const graph_1 = require("./graph");
-const lookup_1 = require("./lookup");
-var graph = graph_1.Graph();
-graph.addEdge("a", "b", 1);
-graph.addEdge("b", "a", 0.5);
-graph.addEdge("b", "c", 1);
-graph.addEdge("c", "b", 0.5);
-graph.addEdge("c", "d", 1);
-graph.addEdge("d", "c", 0.5);
-const lookup = lookup_1.Lookup(graph, 3);
-lookup.Loops(3, ["b", "d"]);
 __exportStar(require("./graph"), exports);
-__exportStar(require("./lookup"), exports);
+const ccxt_pro_1 = __importDefault(require("ccxt.pro"));
+const graph_1 = require("./graph");
+const exchange = new ccxt_pro_1.default.binance();
+const graph = graph_1.Graph();
+exchange.loadMarkets().then(markets => {
+    for (const market of Object.values(markets)) {
+        graph.addEdge(market.base, market.quote);
+        graph.addEdge(market.quote, market.base);
+    }
+    let count = 0;
+    const result = graph.depthFirstSearch(['USDT'], true, false, (list, level, path) => {
+        count++;
+        console.log(level, path);
+    });
+    console.log(result, count);
+});
+// graph.addEdge(1, 2)
+// graph.addEdge(1, 3)
+// graph.addEdge(2, 3)
+// graph.addEdge(2, 4)
+// graph.addEdge(3, 4)
+// graph.addEdge(4, 1)
 //# sourceMappingURL=index.js.map

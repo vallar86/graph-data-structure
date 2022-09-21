@@ -1,12 +1,4 @@
 "use strict";
-/*
-
-1) Прописать типы и интерфейс возврата
-2) Сделать тип узла дженериком
-3) Сделать тип узла дженериком?
-4) Добавить лукап
-
-*/
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Graph = void 0;
 class CycleError extends Error {
@@ -20,6 +12,7 @@ function Graph(serialized) {
     // Returned graph instance
     const graph = {
         addNode,
+        setData,
         removeNode,
         nodes,
         adjacent,
@@ -42,6 +35,8 @@ function Graph(serialized) {
     // Keys are node ids.
     // Values are adjacent node id arrays.
     const edges = new Map();
+    const datas = new Map();
+    const TNodeIdPrototypes = new Set([typeof String(), typeof Symbol(), typeof Number()]);
     // The weights of edges.
     // Keys are string encodings of edges.
     // Values are weights (numbers).
@@ -50,11 +45,33 @@ function Graph(serialized) {
     if (serialized) {
         deserialize(serialized);
     }
+    function toNode(node) {
+        if (TNodeIdPrototypes.has(typeof node)) {
+            return { id: node };
+        }
+        else {
+            return node;
+        }
+    }
+    function toNodeId(node) {
+        if (TNodeIdPrototypes.has(typeof node)) {
+            return node;
+        }
+        else {
+            return node.id;
+        }
+    }
     // Adds a node to the graph.
     // If node was already added, this function does nothing.
     // If node was not already added, this function sets up an empty adjacency list.
     function addNode(node) {
-        edges.set(node, adjacentAsSet(node));
+        const _node = toNode(node);
+        edges.set(_node.id, adjacentAsSet(_node.id));
+        setData(_node.id, _node.data);
+        return graph;
+    }
+    function setData(id, data) {
+        datas.set(id, data);
         return graph;
     }
     // Removes a node from the graph.
@@ -70,12 +87,14 @@ function Graph(serialized) {
         });
         // Remove outgoing edges (and signal that the node no longer exists).
         edges.delete(node);
+        if (datas.has(node))
+            datas.delete(node);
         return graph;
     }
     // Gets the list of nodes that have been added to the graph.
     function nodes() {
         // TODO: Better implementation with set data structure
-        // const nodeSet: Record<NodeId, boolean> = {};
+        // const nodeSet: Record<TNodeId, boolean> = {};
         // Object.keys(edges).forEach(function (u)
         // {
         //     nodeSet[u] = true;
@@ -113,9 +132,11 @@ function Graph(serialized) {
     function addEdge(u, v, weight) {
         addNode(u);
         addNode(v);
-        edges.get(u).add(v);
+        const _u = toNodeId(u);
+        const _v = toNodeId(v);
+        edges.get(_u).add(_v);
         if (weight !== undefined) {
-            setEdgeWeight(u, v, weight);
+            setEdgeWeight(_u, _v, weight);
         }
         return graph;
     }
@@ -154,7 +175,7 @@ function Graph(serialized) {
     // include or exclude the source nodes from the result (true by default).
     // If `sourceNodes` is not specified, all nodes in the graph
     // are used as source nodes.
-    function depthFirstSearch(sourceNodes, includeSourceNodes = true, errorOnCycle = false) {
+    function depthFirstSearch(sourceNodes, includeSourceNodes = true, errorOnCycle = false, callback) {
         if (!sourceNodes) {
             sourceNodes = nodes();
         }
@@ -164,27 +185,32 @@ function Graph(serialized) {
         const visited = new Set();
         const visiting = new Set();
         const nodeList = [];
-        function DFSVisit(node) {
+        const maxLevel = 5;
+        function DFSVisit(node, level = 1, path = []) {
             if (visiting.has(node) && errorOnCycle) {
                 throw new CycleError("Cycle found");
             }
-            if (!visited.has(node)) {
+            if (!visited.has(node) && level <= maxLevel) {
                 visited.add(node);
                 visiting.add(node); // temporary flag while visiting
-                adjacentAsSet(node).forEach(DFSVisit);
+                path.push(node);
+                adjacentAsSet(node).forEach((i) => DFSVisit(i, level + 1, path));
                 visiting.delete(node);
                 nodeList.push(node);
+                if (callback !== undefined)
+                    callback(nodeList, level, path);
+                path.pop();
             }
         }
         if (includeSourceNodes) {
-            sourceNodes.forEach(DFSVisit);
+            sourceNodes.forEach(i => DFSVisit(i));
         }
         else {
             sourceNodes.forEach(function (node) {
                 visited.add(node);
             });
             sourceNodes.forEach(function (node) {
-                adjacentAsSet(node).forEach(DFSVisit);
+                adjacentAsSet(node).forEach(i => DFSVisit(i));
             });
         }
         return nodeList;

@@ -1,21 +1,18 @@
-/*
-
-1) Прописать типы и интерфейс возврата
-2) Сделать тип узла дженериком
-3) Сделать тип узла дженериком?
-4) Добавить лукап
-
-*/
-
 type EdgeWeight = number;
 type EncodedEdge = string;
 
-// type NodeId = string;
+// type TNodeId = string;
 
-interface Serialized<NodeId>
+export interface INode<TNodeId, TNodeData>
+{ 
+    id : TNodeId, 
+    data? : TNodeData 
+}
+
+interface Serialized<TNodeId, TNodeData>
 {
-    nodes: { id: NodeId }[];
-    links: { source: NodeId; target: NodeId; weight: EdgeWeight }[];
+    nodes: INode<TNodeId, TNodeData>[];
+    links: { source: TNodeId; target: TNodeId; weight: EdgeWeight }[];
 }
 
 class CycleError extends Error
@@ -27,38 +24,41 @@ class CycleError extends Error
     }
 }
 
-export interface IGraph<NodeId>
+export interface IGraph<TNodeId, TNodeData>
 {
-    addNode(node: NodeId): IGraph<NodeId>,
-    removeNode(node: NodeId): IGraph<NodeId>,
-    nodes(): NodeId[],
-    adjacent(node: NodeId): NodeId[],
-    addEdge(u: NodeId, v: NodeId, weight?: EdgeWeight): IGraph<NodeId>,
-    removeEdge(u: NodeId, v: NodeId): IGraph<NodeId>,
-    hasEdge(u: NodeId, v: NodeId): boolean,
-    setEdgeWeight(u: NodeId, v: NodeId, weight: EdgeWeight): IGraph<NodeId>,
-    getEdgeWeight(u: NodeId, v: NodeId): EdgeWeight,
-    indegree(node: NodeId): number,
-    outdegree(node: NodeId): number,
+    addNode(node: TNodeId | INode<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>,
+    setData(id : TNodeId, data? : TNodeData) : IGraph<TNodeId, TNodeData>,
+    removeNode(node: TNodeId): IGraph<TNodeId, TNodeData>,
+    nodes(): TNodeId[],
+    adjacent(node: TNodeId): TNodeId[],
+    addEdge(u: TNodeId, v: TNodeId, weight?: EdgeWeight): IGraph<TNodeId, TNodeData>,
+    removeEdge(u: TNodeId, v: TNodeId): IGraph<TNodeId, TNodeData>,
+    hasEdge(u: TNodeId, v: TNodeId): boolean,
+    setEdgeWeight(u: TNodeId, v: TNodeId, weight: EdgeWeight): IGraph<TNodeId, TNodeData>,
+    getEdgeWeight(u: TNodeId, v: TNodeId): EdgeWeight,
+    indegree(node: TNodeId): number,
+    outdegree(node: TNodeId): number,
     depthFirstSearch(
-        sourceNodes: NodeId[],
+        sourceNodes: TNodeId[],
         includeSourceNodes: boolean,
         errorOnCycle: boolean,
-    ): NodeId[],
+        callback? : (nodes: TNodeId[], level : number, path : TNodeId[]) => void
+    ): TNodeId[],
     hasCycle(): boolean,
-    lowestCommonAncestors(node1: NodeId, node2: NodeId): NodeId[],
-    topologicalSort(sourceNodes: NodeId[], includeSourceNodes: boolean): NodeId[],
-    shortestPath(source: NodeId, destination: NodeId): NodeId[] & { weight?: EdgeWeight },
-    serialize(): Serialized<NodeId>,
-    deserialize(serialized: Serialized<NodeId>): IGraph<NodeId>
+    lowestCommonAncestors(node1: TNodeId, node2: TNodeId): TNodeId[],
+    topologicalSort(sourceNodes: TNodeId[], includeSourceNodes: boolean): TNodeId[],
+    shortestPath(source: TNodeId, destination: TNodeId): TNodeId[] & { weight?: EdgeWeight },
+    serialize(): Serialized<TNodeId, TNodeData>,
+    deserialize(serialized: Serialized<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>
 }
 
 // A graph data structure with depth-first search and topological sort.
-export function Graph<NodeId extends string | number | symbol>(serialized?: Serialized<NodeId>) 
+export function Graph<TNodeId extends string | number | symbol, TNodeData extends any | undefined>(serialized?: Serialized<TNodeId, TNodeData>) 
 {
     // Returned graph instance
-    const graph: IGraph<NodeId> = {
+    const graph: IGraph<TNodeId, TNodeData> = {
         addNode,
+        setData,
         removeNode,
         nodes,
         adjacent,
@@ -81,7 +81,9 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     // The adjacency list of the graph.
     // Keys are node ids.
     // Values are adjacent node id arrays.
-    const edges: Map<NodeId, Set<NodeId>> = new Map<NodeId, Set<NodeId>>();
+    const edges: Map<TNodeId, Set<TNodeId>> = new Map<TNodeId, Set<TNodeId>>();
+    const datas: Map<TNodeId, TNodeData | undefined> = new Map<TNodeId, TNodeData | undefined>();
+    const TNodeIdPrototypes = new Set<string>([typeof String(), typeof Symbol(), typeof Number()]);
 
     // The weights of edges.
     // Keys are string encodings of edges.
@@ -94,18 +96,52 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
         deserialize(serialized);
     }
 
+
+    function toNode(node: TNodeId | INode<TNodeId, TNodeData>) : INode<TNodeId, TNodeData>
+    {
+        if (TNodeIdPrototypes.has(typeof node))
+        {
+            return { id: node } as INode<TNodeId, TNodeData>;
+        }
+        else
+        {
+            return node as INode<TNodeId, TNodeData>;
+        }
+    }
+
+    function toNodeId(node: TNodeId | INode<TNodeId, TNodeData>) : TNodeId
+    {
+        if (TNodeIdPrototypes.has(typeof node))
+        {
+            return node as TNodeId;
+        }
+        else
+        {
+            return (node as INode<TNodeId, TNodeData>).id;
+        }
+    }
+
     // Adds a node to the graph.
     // If node was already added, this function does nothing.
     // If node was not already added, this function sets up an empty adjacency list.
-    function addNode(node: NodeId): IGraph<NodeId>
+    
+    function addNode(node: TNodeId | INode<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>
     {
-        edges.set(node, adjacentAsSet(node));
+        const _node = toNode(node);
+        edges.set(_node.id, adjacentAsSet(_node.id));
+        setData(_node.id, _node.data);
+        return graph;
+    }
+
+    function setData(id : TNodeId, data? : TNodeData): IGraph<TNodeId, TNodeData>
+    {
+        datas.set(id, data);
         return graph;
     }
 
     // Removes a node from the graph.
     // Also removes incoming and outgoing edges.
-    function removeNode(node: NodeId): IGraph<NodeId>
+    function removeNode(node: TNodeId): IGraph<TNodeId, TNodeData>
     {
         // Remove incoming edges.
         edges.forEach(function (set, u)
@@ -122,14 +158,15 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
         // Remove outgoing edges (and signal that the node no longer exists).
         edges.delete(node);
 
+        if (datas.has(node)) datas.delete(node);
         return graph;
     }
 
     // Gets the list of nodes that have been added to the graph.
-    function nodes(): NodeId[]
+    function nodes(): TNodeId[]
     {
         // TODO: Better implementation with set data structure
-        // const nodeSet: Record<NodeId, boolean> = {};
+        // const nodeSet: Record<TNodeId, boolean> = {};
 
         // Object.keys(edges).forEach(function (u)
         // {
@@ -146,20 +183,20 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
 
     // Gets the adjacent node list for the given node.
     // Returns an empty array for unknown nodes.
-    function adjacent(node: NodeId): NodeId[]
+    function adjacent(node: TNodeId): TNodeId[]
     {
         return Array.from(adjacentAsSet(node));
     }
 
     // Gets the adjacent node list for the given node.
     // Returns an empty array for unknown nodes.
-    function adjacentAsSet(node: NodeId): Set<NodeId>
+    function adjacentAsSet(node: TNodeId): Set<TNodeId>
     {
-        return edges.get(node) || new Set<NodeId>();
+        return edges.get(node) || new Set<TNodeId>();
     }
 
     // Sets the weight of the given edge.
-    function setEdgeWeight(u: NodeId, v: NodeId, weight: EdgeWeight): IGraph<NodeId>
+    function setEdgeWeight(u: TNodeId, v: TNodeId, weight: EdgeWeight): IGraph<TNodeId, TNodeData>
     {
         edgeWeights[`${u.toString()}|${v.toString()}`] = weight;
         return graph;
@@ -167,7 +204,7 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
 
     // Gets the weight of the given edge.
     // Returns 1 if no weight was previously set.
-    function getEdgeWeight(u: NodeId, v: NodeId): EdgeWeight
+    function getEdgeWeight(u: TNodeId, v: TNodeId): EdgeWeight
     {
         const weight = edgeWeights[`${u.toString()}|${v.toString()}`];
         return weight === undefined ? 1 : weight;
@@ -175,16 +212,22 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
 
     // Adds an edge from node u to node v.
     // Implicitly adds the nodes if they were not already added.
-    function addEdge(u: NodeId, v: NodeId, weight?: EdgeWeight): IGraph<NodeId>
+    function addEdge(
+        u: TNodeId | INode<TNodeId, TNodeData>, 
+        v: TNodeId | INode<TNodeId, TNodeData>, 
+        weight?: EdgeWeight): IGraph<TNodeId, TNodeData>
     {
         addNode(u);
         addNode(v);
-        
-        (edges.get(u) as Set<NodeId>).add(v);
+
+        const _u = toNodeId(u);
+        const _v = toNodeId(v);
+
+        (edges.get(_u) as Set<TNodeId>).add(_v);
 
         if (weight !== undefined)
         {
-            setEdgeWeight(u, v, weight);
+            setEdgeWeight(_u, _v, weight);
         }
 
         return graph;
@@ -193,7 +236,7 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     // Removes the edge from node u to node v.
     // Does not remove the nodes.
     // Does nothing if the edge does not exist.
-    function removeEdge(u: NodeId, v: NodeId): IGraph<NodeId>
+    function removeEdge(u: TNodeId, v: TNodeId): IGraph<TNodeId, TNodeData>
     {
         if (edges.has(u) && edges.get(u)?.has(v))
         {
@@ -203,14 +246,14 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     }
 
     // Returns true if there is an edge from node u to node v.
-    function hasEdge(u: NodeId, v: NodeId): boolean
+    function hasEdge(u: TNodeId, v: TNodeId): boolean
     {
-        return edges.has(u) && (edges.get(u) as Set<NodeId>)?.has(v);
+        return edges.has(u) && (edges.get(u) as Set<TNodeId>)?.has(v);
     }
 
     // Computes the indegree for the given node.
     // Not very efficient, costs O(E) where E = number of edges.
-    function indegree(node: NodeId): number
+    function indegree(node: TNodeId): number
     {
         let degree = 0;
 
@@ -223,9 +266,9 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     }
 
     // Computes the outdegree for the given node.
-    function outdegree(node: NodeId): number 
+    function outdegree(node: TNodeId): number 
     {
-        return edges.has(node) ? (edges.get(node) as Set<NodeId>).size : 0;
+        return edges.has(node) ? (edges.get(node) as Set<TNodeId>).size : 0;
     }
 
     // Depth First Search algorithm, inspired by
@@ -235,10 +278,11 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     // If `sourceNodes` is not specified, all nodes in the graph
     // are used as source nodes.
     function depthFirstSearch(
-        sourceNodes?: NodeId[],
+        sourceNodes?: TNodeId[],
         includeSourceNodes: boolean = true,
         errorOnCycle: boolean = false,
-    ): NodeId[]
+        callback? : (nodes: TNodeId[], level : number, path : TNodeId[]) => void
+    ): TNodeId[]
     {
         if (!sourceNodes)
         {
@@ -250,29 +294,39 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
             includeSourceNodes = true;
         }
 
-        const visited: Set<NodeId> = new Set<NodeId>();
-        const visiting: Set<NodeId> = new Set<NodeId>();
-        const nodeList: NodeId[] = [];
+        const visited: Set<TNodeId> = new Set<TNodeId>();
+        const visiting: Set<TNodeId> = new Set<TNodeId>();
+        const nodeList: TNodeId[] = [];
+        const maxLevel: number = 5;
 
-        function DFSVisit(node: NodeId): void
+        function DFSVisit(node: TNodeId, level : number = 1, path : TNodeId[] = []): void
         {
             if (visiting.has(node) && errorOnCycle)
             {
                 throw new CycleError("Cycle found");
             }
-            if (!visited.has(node))
+            if (!visited.has(node) && level <= maxLevel)
             {
                 visited.add(node);
                 visiting.add(node);  // temporary flag while visiting
-                adjacentAsSet(node).forEach(DFSVisit);
+                
+                path.push(node);
+                adjacentAsSet(node).forEach((i) => DFSVisit(i, level + 1, path));
+                
+
                 visiting.delete(node);
                 nodeList.push(node);
+
+                if (callback !== undefined)
+                    callback(nodeList, level, path);
+
+                path.pop();
             }
         }
 
         if (includeSourceNodes)
         {
-            sourceNodes.forEach(DFSVisit);
+            sourceNodes.forEach(i => DFSVisit(i));
         } else
         {
             sourceNodes.forEach(function (node)
@@ -281,7 +335,7 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
             });
             sourceNodes.forEach(function (node)
             {
-                adjacentAsSet(node).forEach(DFSVisit);
+                adjacentAsSet(node).forEach(i => DFSVisit(i));
             });
         }
 
@@ -313,14 +367,14 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     // Least Common Ancestors
     // Inspired by https://github.com/relaxedws/lca/blob/master/src/LowestCommonAncestor.php code
     // but uses depth search instead of breadth. Also uses some optimizations
-    function lowestCommonAncestors(node1: NodeId, node2: NodeId): NodeId[]
+    function lowestCommonAncestors(node1: TNodeId, node2: TNodeId): TNodeId[]
     {
-        const node1Ancestors: NodeId[] = [];
-        const lcas: NodeId[] = [];
+        const node1Ancestors: TNodeId[] = [];
+        const lcas: TNodeId[] = [];
 
         function CA1Visit(
-            visited: Set<NodeId>,
-            node: NodeId
+            visited: Set<TNodeId>,
+            node: TNodeId
         ): boolean
         {
             if (!visited.has(node))
@@ -341,7 +395,7 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
             }
         }
 
-        function CA2Visit(visited: Set<NodeId>, node: NodeId)
+        function CA2Visit(visited: Set<TNodeId>, node: TNodeId)
         {
             if (!visited.has(node))
             {
@@ -359,10 +413,10 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
             }
         }
 
-        if (CA1Visit(new Set<NodeId>(), node1))
+        if (CA1Visit(new Set<TNodeId>(), node1))
         {
             // No shortcut worked
-            CA2Visit(new Set<NodeId>(), node2);
+            CA2Visit(new Set<TNodeId>(), node2);
         }
 
         return lcas;
@@ -373,9 +427,9 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     // Amazingly, this comes from just reversing the result from depth first search.
     // Cormen et al. "Introduction to Algorithms" 3rd Ed. p. 613
     function topologicalSort(
-        sourceNodes?: NodeId[],
+        sourceNodes?: TNodeId[],
         includeSourceNodes: boolean = true
-    ): NodeId[]
+    ): TNodeId[]
     {
         return depthFirstSearch(sourceNodes, includeSourceNodes, true).reverse();
     }
@@ -383,15 +437,15 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     // Dijkstra's Shortest Path Algorithm.
     // Cormen et al. "Introduction to Algorithms" 3rd Ed. p. 658
     // Variable and function names correspond to names in the book.
-    function shortestPath(source: NodeId, destination: NodeId) {
+    function shortestPath(source: TNodeId, destination: TNodeId) {
         // Upper bounds for shortest path weights from source.
-        const d: Record<NodeId, EdgeWeight> = {} as Record<NodeId, EdgeWeight>;
+        const d: Record<TNodeId, EdgeWeight> = {} as Record<TNodeId, EdgeWeight>;
 
         // Predecessors.
-        const p: Record<NodeId, NodeId> = {} as Record<NodeId, NodeId>;
+        const p: Record<TNodeId, TNodeId> = {} as Record<TNodeId, TNodeId>;
 
         // Poor man's priority queue, keyed on d.
-        let q: Record<NodeId, boolean> = {} as Record<NodeId, boolean>;
+        let q: Record<TNodeId, boolean> = {} as Record<TNodeId, boolean>;
 
         function initializeSingleSource() {
             nodes().forEach(function(node) {
@@ -419,7 +473,7 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
         }
 
         // Linear search to extract (find and remove) min from q.
-        function extractMin(): NodeId | null {
+        function extractMin(): TNodeId | null {
             let min = Infinity;
             let minNode;
 
@@ -427,21 +481,21 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
 
 
             Object.keys(q).forEach(function(node) {
-                if (d[node as NodeId] < min) {
-                    min = d[node as NodeId];
+                if (d[node as TNodeId] < min) {
+                    min = d[node as TNodeId];
                     minNode = node;
                 }
             });
             if (minNode === undefined) {
                 // If we reach here, there's a disconnected subgraph, and we're done.
-                q = {} as Record<NodeId, boolean>;
+                q = {} as Record<TNodeId, boolean>;
                 return null;
             }
             delete q[minNode];
             return minNode;
         }
 
-        function relax(u: NodeId, v: NodeId) {
+        function relax(u: TNodeId, v: TNodeId) {
             const w = getEdgeWeight(u, v);
             if (d[v] > d[u] + w) {
                 d[v] = d[u] + w;
@@ -464,7 +518,7 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
         // Assembles the shortest path by traversing the
         // predecessor subgraph from destination to source.
         function path() {
-            const nodeList: NodeId[] & { weight?: EdgeWeight } = [];
+            const nodeList: TNodeId[] & { weight?: EdgeWeight } = [];
             let weight = 0;
             let node = destination;
             while (p[node]) {
@@ -487,9 +541,9 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     }
 
     // Serializes the graph.
-    function serialize(): Serialized<NodeId>
+    function serialize(): Serialized<TNodeId, TNodeData>
     {
-        const serialized: Serialized<NodeId> = {
+        const serialized: Serialized<TNodeId, TNodeData> = {
             nodes: nodes().map(function (id)
             {
                 return { id: id };
@@ -514,7 +568,7 @@ export function Graph<NodeId extends string | number | symbol>(serialized?: Seri
     }
 
     // Deserializes the given serialized graph.
-    function deserialize(serialized: Serialized<NodeId>): IGraph<NodeId>
+    function deserialize(serialized: Serialized<TNodeId, TNodeData>): IGraph<TNodeId, TNodeData>
     {
         serialized.nodes.forEach(function (node)
         {
